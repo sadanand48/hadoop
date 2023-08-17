@@ -24,9 +24,8 @@ import java.io.OutputStream;
 import java.util.EnumSet;
 
 import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.apache.hadoop.hdfs.protocol.ECFilesystemCommon;
 import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicy;
-import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.tools.DistCpOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -204,12 +203,19 @@ public class RetriableFileCopyCommand extends RetriableCommand {
         DistCpConstants.COPY_BUFFER_SIZE_DEFAULT);
     boolean preserveEC = getFileAttributeSettings(context)
         .contains(DistCpOptions.FileAttribute.ERASURECODINGPOLICY);
+    boolean doesTargetFSSupportEC = doesFSSupportEC(targetFS);
 
     ErasureCodingPolicy ecPolicy = null;
+    ECFilesystemCommon ecFilesystemCommon = null;
     if (preserveEC && sourceStatus.isErasureCoded()
-        && sourceStatus instanceof HdfsFileStatus
-        && targetFS instanceof DistributedFileSystem) {
-      ecPolicy = ((HdfsFileStatus) sourceStatus).getErasureCodingPolicy();
+      && doesTargetFSSupportEC) {
+      try {
+        ecFilesystemCommon = getEcFilesystemCommon(targetFS);
+      } catch (Exception exception) {
+        LOG.error("Failed to getEcFilesystemCommon", exception);
+        throw new IOException(exception);
+      }
+      ecPolicy = ecFilesystemCommon.getErasureCodingPolicy(sourceStatus);
     }
     final OutputStream outStream;
     if (action == FileAction.OVERWRITE) {
@@ -227,16 +233,9 @@ public class RetriableFileCopyCommand extends RetriableCommand {
             EnumSet.of(CreateFlag.CREATE, CreateFlag.OVERWRITE), copyBufferSize,
             repl, blockSize, context, checksumOpt);
       } else {
-        DistributedFileSystem dfs = (DistributedFileSystem) targetFS;
-        DistributedFileSystem.HdfsDataOutputStreamBuilder builder =
-            dfs.createFile(targetPath).permission(permission).create()
-                .overwrite(true).bufferSize(copyBufferSize).replication(repl)
-                .blockSize(blockSize).progress(context).recursive()
-                .ecPolicyName(ecPolicy.getName());
-        if (checksumOpt != null) {
-          builder.checksumOpt(checksumOpt);
-        }
-        out = builder.build();
+        out = ecFilesystemCommon.createECOutputStream(targetFS,
+            targetPath,permission,copyBufferSize,repl,blockSize,
+            checksumOpt,ecPolicy.getName());
       }
       outStream = new BufferedOutputStream(out);
     } else {

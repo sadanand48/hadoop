@@ -19,9 +19,8 @@
 package org.apache.hadoop.tools.mapred;
 
 import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.apache.hadoop.hdfs.protocol.ECFilesystemCommon;
 import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicy;
-import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.tools.DistCpOptions;
 import org.apache.hadoop.tools.util.RetriableCommand;
 import org.apache.hadoop.fs.Path;
@@ -65,12 +64,14 @@ public class RetriableDirectoryCreateCommand extends RetriableCommand {
 
     boolean preserveEC = getFileAttributeSettings(context)
         .contains(DistCpOptions.FileAttribute.ERASURECODINGPOLICY);
-    if (preserveEC && sourceStatus.isErasureCoded()
-        && targetFS instanceof DistributedFileSystem) {
+    boolean doesTargetFSSupportEC = doesFSSupportEC(targetFS);
+    if (preserveEC && sourceStatus.isErasureCoded() && doesTargetFSSupportEC) {
+      ECFilesystemCommon ecFilesystemCommon =
+         getEcFilesystemCommon(targetFS);
       ErasureCodingPolicy ecPolicy =
-          ((HdfsFileStatus) sourceStatus).getErasureCodingPolicy();
-      DistributedFileSystem dfs = (DistributedFileSystem) targetFS;
-      dfs.setErasureCodingPolicy(target, ecPolicy.getName());
+          ecFilesystemCommon.getErasureCodingPolicy(sourceStatus);
+      ecFilesystemCommon.setErasureCodingPolicy(targetFS, target,
+          ecPolicy.getName());
     }
     return true;
   }

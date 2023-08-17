@@ -19,6 +19,8 @@
 
 package org.apache.hadoop.tools.util;
 
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.hdfs.protocol.ECFilesystemCommon;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.io.retry.RetryPolicy;
@@ -27,6 +29,8 @@ import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.util.ThreadUtil;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -111,4 +115,29 @@ public abstract class RetriableCommand {
     this.retryPolicy = retryHandler;
     return this;
   }
+
+
+  protected ECFilesystemCommon getEcFilesystemCommon(FileSystem fs)
+      throws NoSuchMethodException, InvocationTargetException,
+      IllegalAccessException {
+    return (ECFilesystemCommon) getECFilesystemCommonMethod(fs).invoke(fs);
+  }
+
+  protected boolean doesFSSupportEC(FileSystem fs) {
+    try {
+      getECFilesystemCommonMethod(fs);
+    } catch (NoSuchMethodException exception) {
+      LOG.error("Filesystem with scheme :{} doesn't support EC feature",
+          fs.getScheme());
+      return false;
+    }
+    return true;
+  }
+
+
+  static Method getECFilesystemCommonMethod(FileSystem fs)
+      throws NoSuchMethodException {
+    return fs.getClass().getMethod("getECFileSystemImpl");
+  }
+
 }

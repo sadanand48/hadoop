@@ -91,6 +91,7 @@ import org.apache.hadoop.hdfs.protocol.HdfsPartialListing;
 import org.apache.hadoop.hdfs.protocol.EncryptionZone;
 import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicy;
 import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicyInfo;
+import org.apache.hadoop.hdfs.protocol.ECFilesystemCommon;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.ReencryptAction;
@@ -3445,6 +3446,10 @@ public class DistributedFileSystem extends FileSystem
   public ECTopologyVerifierResult getECTopologyResultForPolicies(
       final String... policyNames) throws IOException {
     return dfs.getECTopologyResultForPolicies(policyNames);
+  }
+
+  public ECFilesystemCommon getECFileSystemImpl(){
+    return ECFilesystemCommon.createECFileSystemCommon();
   }
 
   /**
